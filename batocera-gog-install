@@ -1,0 +1,68 @@
+#!/bin/bash
+
+# Check the arguments
+if [ $# -ne 1 ]; then
+    echo "Usage: $0 <folder_name>"
+    exit 1
+fi
+
+# Get the folder name passed as an argument
+GAME_NAME="$1"
+PROFILE_FILE="/usr/share/batocera/gog-install/$GAME_NAME"
+
+# Paths to directories
+DEST_DIR="/userdata/roms/windows/${GAME_NAME}.pc"
+EXTRACTED_DIR="/userdata/roms/windows/extracted_files"
+
+# Check if the profile file exists
+if [ ! -f "$PROFILE_FILE" ]; then
+    echo "Profile $GAME_NAME does not exist."
+    exit 1
+fi
+
+# Check if the corresponding executable file exists
+EXE_FILE=$(find /userdata/roms/windows -maxdepth 1 -type f -name "*$GAME_NAME*" -iname "*.exe" | head -n 1)
+
+if [ -z "$EXE_FILE" ]; then
+    echo "Installation file $GAME_NAME not found."
+    exit 1
+fi
+
+# Create the destination directory
+mkdir -p "$DEST_DIR"
+
+# Create the extraction directory if it doesn't exist
+mkdir -p "$EXTRACTED_DIR"
+
+# Extract the content of the exe file using innoextract
+innoextract "$EXE_FILE" -d "$EXTRACTED_DIR"
+
+# Read the copy file and copy the elements
+while IFS= read -r item; do
+    # Ignore empty lines and comments
+    if [[ $item =~ ^[^#] && -n "$item" && $item != "DIR="* && $item != "CMD="* ]]; then
+        cp -r "$EXTRACTED_DIR/$item" "$DEST_DIR"
+    fi
+done < "$PROFILE_FILE"
+
+# Extract DIR= and CMD= lines from the profile file
+DIR_LINE=$(grep -o 'DIR=.*' "$PROFILE_FILE")
+CMD_LINE=$(grep -o 'CMD=.*' "$PROFILE_FILE")
+
+# Create the autorun.cmd file and write the DIR= and CMD= lines
+echo "$DIR_LINE" > "$DEST_DIR/autorun.cmd"
+echo "$CMD_LINE" >> "$DEST_DIR/autorun.cmd"
+
+# Cleaning up: remove the extraction directory
+rm -r "$EXTRACTED_DIR"
+
+echo "Extraction, copy, and cleanup completed."
+
+# Ask if the initial installation file should be removed
+read -p "Do you want to remove the initial installation file? (yes/no): " choice
+if [ "$choice" = "yes" ]; then
+    rm "$EXE_FILE"
+    echo "The initial installation file has been removed."
+else
+    echo "The initial installation file has not been removed."
+fi
