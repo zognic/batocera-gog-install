@@ -1,3 +1,15 @@
 # batocera-gog-install
 
-use `batocera-gog-install <path_to_profile>`
+### Installation ###
+copy the file innoextract from tools inside `/usr/bin/`
+
+`chmod +x /usr/bin/batocera-gog-install`
+
+Copy the profile file you want to extract
+
+### Exemple ###
+Copy the broforce windows setup file inside `/userdata/roms/windows`
+Launch `batocera-gog-install broforce`
+
+Refresh GameListe
+
