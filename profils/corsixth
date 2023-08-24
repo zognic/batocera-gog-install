@@ -1,0 +1,15 @@
+######################################################
+### GOG Installation Profile For CorsixTH Engine ###
+######################################################
+
+### ROMS PATH ###
+ROMS_DIR=/userdata/roms/corsixth
+
+### FILES TO BE COPIED ###
+FILES:
+ANIMS
+DATA
+INTRO
+LEVELS
+QDATA
+SOUND
