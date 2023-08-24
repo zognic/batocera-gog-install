@@ -1,0 +1,21 @@
+######################################################
+### GOG Installation Profile For the game Broforce ###
+######################################################
+
+### GAME FOLDER NAME ###
+FOLDER=Broforce2.pc
+
+### ROMS PATH ###
+ROMS_DIR=/userdata/roms/windows
+
+### FILES TO BE COPIED ###
+FILES:
+Broforce_Data/
+Broforce.exe
+UnityPlayer.dll
+
+#### AUTORUN ####
+AUTORUN:
+DIR=/
+CMD=Broforce.exe
+
