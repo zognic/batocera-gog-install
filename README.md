@@ -1,7 +1,7 @@
 # batocera-gog-install
 
 ### Installation ###
-copy the file innoextract from tools inside `/usr/bin/`
+copy the file `innoextract` from innoextract folder to `/usr/bin/`
 
 `chmod +x /usr/bin/batocera-gog-install`
 
