@@ -2,56 +2,93 @@
 
 # Check the arguments
 if [ $# -ne 1 ]; then
-    echo "Usage: $0 <folder_name>"
+    echo "Usage: $0 <profile_file>"
     exit 1
 fi
 
-# Get the folder name passed as an argument
-GAME_NAME="$1"
-PROFILE_FILE="/usr/share/batocera/gog-install/$GAME_NAME"
-
-# Paths to directories
-DEST_DIR="/userdata/roms/windows/${GAME_NAME}.pc"
-EXTRACTED_DIR="/userdata/roms/windows/extracted_files"
+# Get the profile file path from the argument
+PROFILE_FILE="$1"
 
 # Check if the profile file exists
 if [ ! -f "$PROFILE_FILE" ]; then
-    echo "Profile $GAME_NAME does not exist."
+    echo "Profile file $PROFILE_FILE does not exist."
     exit 1
 fi
 
-# Check if the corresponding executable file exists
-EXE_FILE=$(find /userdata/roms/windows -maxdepth 1 -type f -name "*$GAME_NAME*" -iname "*.exe" | head -n 1)
+# Read the profile content to extract FOLDER and ROMS_DIR
+while IFS= read -r line; do
+    if [[ "$line" =~ ^FOLDER=(.*)$ ]]; then
+        FOLDER="${BASH_REMATCH[1]}"
+    elif [[ "$line" =~ ^ROMS_DIR=(.*)$ ]]; then
+        ROMS_DIR="${BASH_REMATCH[1]}"
+    elif [[ "$line" =~ ^FILES: ]]; then
+        in_files_section=true
+    elif [[ "$line" =~ ^AUTORUN: ]]; then
+        in_autorun_section=true
+    elif [[ "$line" =~ ^$ ]]; then
+        in_files_section=false
+        in_autorun_section=false
+    elif [ "$in_files_section" = true ]; then
+        FILES+=("$line")
+    elif [ "$in_autorun_section" = true ]; then
+        if [[ "$line" =~ ^DIR=(.*)$ ]]; then
+            DIR="${BASH_REMATCH[1]}"
+        elif [[ "$line" =~ ^CMD=(.*)$ ]]; then
+            CMD="${BASH_REMATCH[1]}"
+        fi
+    fi
+done < "$PROFILE_FILE"
 
-if [ -z "$EXE_FILE" ]; then
-    echo "Installation file $GAME_NAME not found."
+# Check if ROMS_DIR is specified in the profile
+if [ -z "$ROMS_DIR" ]; then
+    echo "ROMS_DIR not specified in the profile."
     exit 1
+fi
+
+# If FOLDER is not specified or empty, use ROMS_DIR as destination
+if [ -z "$FOLDER" ]; then
+    DEST_DIR="$ROMS_DIR"
+else
+    DEST_DIR="$ROMS_DIR/$FOLDER"
 fi
 
 # Create the destination directory
 mkdir -p "$DEST_DIR"
 
-# Create the extraction directory if it doesn't exist
+# Create the temporary extraction directory
+EXTRACTED_DIR="$DEST_DIR/tmp"
 mkdir -p "$EXTRACTED_DIR"
+
+# Find the executable that contains the game name
+GAME_NAME=$(basename "$PROFILE_FILE" | cut -d. -f1)
+
+EXE_FILE=$(find "$ROMS_DIR" -maxdepth 1 -type f -iname "*$GAME_NAME*" -print -quit)
+
+if [ -z "$EXE_FILE" ]; then
+    echo "No installation file found for '$GAME_NAME'."
+    exit 1
+fi
 
 # Extract the content of the exe file using innoextract
 innoextract "$EXE_FILE" -d "$EXTRACTED_DIR"
 
-# Read the copy file and copy the elements
-while IFS= read -r item; do
-    # Ignore empty lines and comments
-    if [[ $item =~ ^[^#] && -n "$item" && $item != "DIR="* && $item != "CMD="* ]]; then
+# Copy the files specified in the FILES section
+for item in "${FILES[@]}"; do
+    if [ -e "$EXTRACTED_DIR/$item" ]; then
         cp -r "$EXTRACTED_DIR/$item" "$DEST_DIR"
+    else
+        echo "File '$item' not found in the extracted directory."
     fi
-done < "$PROFILE_FILE"
+done
 
-# Extract DIR= and CMD= lines from the profile file
-DIR_LINE=$(grep -o 'DIR=.*' "$PROFILE_FILE")
-CMD_LINE=$(grep -o 'CMD=.*' "$PROFILE_FILE")
+# Create the autorun.cmd file with DIR and CMD lines
+if [ -n "$DIR" ]; then
+    echo "DIR=$DIR" > "$DEST_DIR/autorun.cmd"
+fi
 
-# Create the autorun.cmd file and write the DIR= and CMD= lines
-echo "$DIR_LINE" > "$DEST_DIR/autorun.cmd"
-echo "$CMD_LINE" >> "$DEST_DIR/autorun.cmd"
+if [ -n "$CMD" ]; then
+    echo "CMD=$CMD" >> "$DEST_DIR/autorun.cmd"
+fi
 
 # Cleaning up: remove the extraction directory
 rm -r "$EXTRACTED_DIR"
